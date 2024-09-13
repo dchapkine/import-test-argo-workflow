@@ -815,6 +815,22 @@ func (tmpl *Template) GetOutputs() *Outputs {
 	return nil
 }
 
+const (
+	// ExecutorStagingEmptyDir is the path of the emptydir which is used as a staging area to transfer a file between init/main container for script/resource templates
+	ExecutorStagingEmptyDir = "/argo/staging"
+	// ExecutorScriptSourcePath is the path which init will write the script source file to for script templates
+	executorScriptSourcePath = "/argo/staging/script"
+)
+
+func (tmpl *Template) GetScriptSourcePath() string {
+	extension := tmpl.Script.Extension
+	if len(extension) != 0 {
+		return executorScriptSourcePath + "." + tmpl.Script.Extension
+	} else {
+		return executorScriptSourcePath
+	}
+}
+
 type Artifacts []Artifact
 
 func (a Artifacts) GetArtifactByName(name string) *Artifact {
@@ -2977,6 +2993,9 @@ type ScriptTemplate struct {
 
 	// Source contains the source code of the script to execute
 	Source string `json:"source" protobuf:"bytes,2,opt,name=source"`
+
+	// Extension specifies the file extension to use
+	Extension string `json:"extension" protobuf:"bytes,3,opt,name=extension"`
 }
 
 // ResourceTemplate is a template subtype to manipulate kubernetes resources

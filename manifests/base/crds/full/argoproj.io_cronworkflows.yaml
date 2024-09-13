@@ -8544,6 +8544,8 @@ spec:
                                   x-kubernetes-map-type: atomic
                               type: object
                             type: array
+                          extension:
+                            type: string
                           image:
                             type: string
                           imagePullPolicy:
@@ -9050,6 +9052,7 @@ spec:
                           workingDir:
                             type: string
                         required:
+                        - extension
                         - name
                         - source
                         type: object
@@ -17044,6 +17047,8 @@ spec:
                                     x-kubernetes-map-type: atomic
                                 type: object
                               type: array
+                            extension:
+                              type: string
                             image:
                               type: string
                             imagePullPolicy:
