@@ -31,6 +31,7 @@ import {WorkflowsToolbar} from '../workflows-toolbar/workflows-toolbar';
 import './workflows-list.scss';
 import useTimestamp, {TIMESTAMP_KEYS} from '../../../shared/use-timestamp';
 import {TimestampSwitch} from '../../../shared/components/timestamp';
+import {getWorkflowParametersFromQuery} from '../../../shared/get_workflow_params';
 
 interface WorkflowListRenderOptions {
     paginationLimit: number;
@@ -135,6 +136,18 @@ export function WorkflowsList({match, location, history}: RouteComponentProps<an
         if (pagination.limit) {
             params.append('limit', pagination.limit.toString());
         }
+
+        // Add any workflow parameters to the query
+        const workflowProperties = getWorkflowParametersFromQuery();
+        console.log(workflowProperties);
+        Object.keys(workflowProperties).forEach(key => {
+            params.append(`parameters[${key}]`, workflowProperties[key]);
+        });
+
+        // Add the sidePanel query parameter if it exists
+        params.append('sidePanel', getSidePanel());
+        params.append('template', queryParams.get('template'));
+
         history.push(historyUrl('workflows' + (nsUtils.getManagedNamespace() ? '' : '/{namespace}'), {namespace, extraSearchParams: params}));
     }, [namespace, phases.toString(), labels.toString(), pagination.limit, pagination.offset]); // referential equality, so use values, not refs
 
@@ -330,7 +343,23 @@ export function WorkflowsList({match, location, history}: RouteComponentProps<an
                     )}
                 </div>
             </div>
-            <SlidingPanel isShown={!!getSidePanel()} onClose={() => navigation.goto('.', {sidePanel: null})}>
+            <SlidingPanel
+                isShown={!!getSidePanel()}
+                onClose={() => {
+                    // Remove any lingering query params
+                    const qParams: {[key: string]: string | null} = {
+                        sidePanel: null
+                    };
+                    // Remove any lingering query params
+                    for (const key of queryParams.keys()) {
+                        qParams[key] = null;
+                    }
+                    // Add back the pagination and namespace params.
+                    qParams.limit = pagination.limit.toString();
+                    qParams.offset = pagination.offset || null;
+                    qParams.namespace = namespace;
+                    navigation.goto('.', qParams);
+                }}>
                 {getSidePanel() === 'submit-new-workflow' && (
                     <WorkflowCreator
                         namespace={nsUtils.getNamespaceWithDefault(namespace)}

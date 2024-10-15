@@ -2,11 +2,12 @@ import {Select} from 'argo-ui/src/components/select/select';
 import * as React from 'react';
 import {useEffect, useState} from 'react';
 
-import {Workflow, WorkflowTemplate} from '../../../models';
+import {Parameter, Workflow, WorkflowTemplate} from '../../../models';
 import {Button} from '../../shared/components/button';
 import {ErrorNotice} from '../../shared/components/error-notice';
 import {ExampleManifests} from '../../shared/components/example-manifests';
 import {UploadButton} from '../../shared/components/upload-button';
+import {getWorkflowParametersFromQuery} from '../../shared/get_workflow_params';
 import {exampleWorkflow} from '../../shared/examples';
 import {services} from '../../shared/services';
 import * as nsUtils from '../../shared/namespaces';
@@ -21,7 +22,8 @@ export function WorkflowCreator({namespace, onCreate}: {namespace: string; onCre
     const [stage, setStage] = useState<Stage>('choose-method');
     const [workflow, setWorkflow] = useState<Workflow>();
     const [error, setError] = useState<Error>();
-
+    const queryParams = new URLSearchParams(location.search);
+    const template = queryParams.get('template');
     useEffect(() => {
         services.workflowTemplate
             .list(namespace, [])
@@ -60,6 +62,48 @@ export function WorkflowCreator({namespace, onCreate}: {namespace: string; onCre
             setStage('submit-workflow');
         }
     }, [workflowTemplate]);
+
+    useEffect(() => {
+        if (template != null && workflowTemplates) {
+            // Fetch matching template from the list of templates
+            const workflowTemplate = workflowTemplates.find(tmpl => tmpl.metadata.name === template);
+            // If we have a matching template set default values.
+            if (workflowTemplate) {
+                setWorkflowTemplate(workflowTemplate);
+
+                const templatePropertiesInQuery = getWorkflowParametersFromQuery();
+                // Get the user arguments from the query params
+                const updatedParams = workflowTemplate.spec.arguments.parameters.map(param => {
+                    const queryValue = templatePropertiesInQuery[param.name];
+                    const p: Parameter = {
+                        name: param.name,
+                        value: queryValue || param.value
+                    };
+                    return p;
+                });
+
+                workflowTemplate.spec.arguments.parameters = updatedParams;
+
+                setWorkflow({
+                    metadata: {
+                        generateName: workflowTemplate.metadata.name + '-',
+                        namespace,
+                        labels: {
+                            'workflows.argoproj.io/workflow-template': workflowTemplate.metadata.name,
+                            'submit-from-ui': 'true'
+                        }
+                    },
+                    spec: {
+                        entrypoint: workflowTemplate.spec.entrypoint,
+                        arguments: {
+                            ...workflowTemplate.spec.arguments,
+                            parameters: updatedParams
+                        }
+                    }
+                });
+            }
+        }
+    }, [template, workflowTemplates]);
 
     return (
         <>
