@@ -138,8 +138,8 @@ export function WorkflowsList({match, location, history}: RouteComponentProps<an
         }
 
         // Add any workflow parameters to the query
-        const workflowProperties = getWorkflowParametersFromQuery();
-        console.log(workflowProperties);
+        const workflowProperties = getWorkflowParametersFromQuery(history);
+
         Object.keys(workflowProperties).forEach(key => {
             params.append(`parameters[${key}]`, workflowProperties[key]);
         });
@@ -363,6 +363,7 @@ export function WorkflowsList({match, location, history}: RouteComponentProps<an
                 {getSidePanel() === 'submit-new-workflow' && (
                     <WorkflowCreator
                         namespace={nsUtils.getNamespaceWithDefault(namespace)}
+                        history={history}
                         onCreate={wf => navigation.goto(uiUrl(`workflows/${wf.metadata.namespace}/${wf.metadata.name}`))}
                     />
                 )}
