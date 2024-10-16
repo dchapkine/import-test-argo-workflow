@@ -31,7 +31,6 @@ import {WorkflowsToolbar} from '../workflows-toolbar/workflows-toolbar';
 import './workflows-list.scss';
 import useTimestamp, {TIMESTAMP_KEYS} from '../../../shared/use-timestamp';
 import {TimestampSwitch} from '../../../shared/components/timestamp';
-import {getWorkflowParametersFromQuery} from '../../../shared/get_workflow_params';
 
 interface WorkflowListRenderOptions {
     paginationLimit: number;
@@ -127,7 +126,7 @@ export function WorkflowsList({match, location, history}: RouteComponentProps<an
         }
         storage.setItem('options', options, {} as WorkflowListRenderOptions);
 
-        const params = new URLSearchParams();
+        const params = new URLSearchParams(history.location.search);
         phases?.forEach(phase => params.append('phase', phase));
         labels?.forEach(label => params.append('label', label));
         if (pagination.offset) {
@@ -136,17 +135,6 @@ export function WorkflowsList({match, location, history}: RouteComponentProps<an
         if (pagination.limit) {
             params.append('limit', pagination.limit.toString());
         }
-
-        // Add any workflow parameters to the query
-        const workflowProperties = getWorkflowParametersFromQuery(history);
-
-        Object.keys(workflowProperties).forEach(key => {
-            params.append(`parameters[${key}]`, workflowProperties[key]);
-        });
-
-        // Add the sidePanel query parameter if it exists
-        params.append('sidePanel', getSidePanel());
-        params.append('template', queryParams.get('template'));
 
         history.push(historyUrl('workflows' + (nsUtils.getManagedNamespace() ? '' : '/{namespace}'), {namespace, extraSearchParams: params}));
     }, [namespace, phases.toString(), labels.toString(), pagination.limit, pagination.offset]); // referential equality, so use values, not refs
