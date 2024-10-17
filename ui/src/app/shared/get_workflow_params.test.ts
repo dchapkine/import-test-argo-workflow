@@ -1,4 +1,4 @@
-import {createBrowserHistory, createPath} from 'history';
+import {createBrowserHistory} from 'history';
 import {getWorkflowParametersFromQuery} from './get_workflow_params';
 
 describe('get_workflow_params', () => {
@@ -10,8 +10,7 @@ describe('get_workflow_params', () => {
 
     it('should return the parameters provided in the URL', () => {
         const history = createBrowserHistory();
-        const path = createPath({pathname: '/workflows', search: '?parameters[key1]=value1&parameters[key2]=value2'});
-        history.location.search = path;
+        history.location.search = '?parameters[key1]=value1&parameters[key2]=value2';
         const result = getWorkflowParametersFromQuery(history);
         expect(result).toEqual({
             key1: 'value1',
@@ -19,10 +18,16 @@ describe('get_workflow_params', () => {
         });
     });
 
+    it('should not return any key value pairs which are not in parameters query ', () => {
+        const history = createBrowserHistory();
+        history.location.search = '?retryparameters[key1]=value1&retryparameters[key2]=value2';
+        const result = getWorkflowParametersFromQuery(history);
+        expect(result).toEqual({});
+    });
+
     it('should only return the parameters provided in the URL', () => {
         const history = createBrowserHistory();
-        const path = createPath({pathname: '/workflows', search: '?parameters[key1]=value1&parameters[key2]=value2&test=123'});
-        history.location.search = path;
+        history.location.search = '?parameters[key1]=value1&parameters[key2]=value2&test=123';
         const result = getWorkflowParametersFromQuery(history);
         expect(result).toEqual({
             key1: 'value1',
