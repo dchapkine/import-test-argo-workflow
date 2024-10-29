@@ -81,8 +81,7 @@ func NewAPIClient(ctx context.Context) (context.Context, apiclient.Client, error
 			OfflineFiles:         OfflineFiles,
 			Context:              ctx,
 			Proxy:                proxy,
-		}
-	)
+		})
 }
 
 func Namespace() string {
