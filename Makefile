@@ -794,3 +794,12 @@ release-notes: /dev/null
 .PHONY: checksums
 checksums:
 	sha256sum ./dist/argo-*.gz | awk -F './dist/' '{print $$1 $$2}' > ./dist/argo-workflows-cli-checksums.txt
+
+kubebuilder:
+	curl -L -o kubebuilder "https://go.kubebuilder.io/dl/latest/$(go env GOOS)/$(go env GOARCH)" &&
+	chmod +x kubebuilder && mv kubebuilder /usr/local/bin/
+
+scaffold-webhook:
+	kubebuilder create webhook --programmatic-validation --external-api-domain argoproj --external-api-path github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1 --kind Workflow --version v1alpha1 --group argoproj.io
+
+generate:
