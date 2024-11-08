@@ -15,6 +15,8 @@ import (
 
 	argoprojiov1alpha1 "github.com/argoproj/argo-workflows/v3/pkg/apis/workflow/v1alpha1"
 	admissionv1 "k8s.io/api/admission/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	// +kubebuilder:scaffold:imports
 	apimachineryruntime "k8s.io/apimachinery/pkg/runtime"
@@ -32,11 +34,12 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 var (
-	cancel    context.CancelFunc
-	cfg       *rest.Config
-	ctx       context.Context
-	k8sClient client.Client
-	testEnv   *envtest.Environment
+	cancel            context.CancelFunc
+	cfg               *rest.Config
+	ctx               context.Context
+	k8sClient         client.Client
+	testEnv           *envtest.Environment
+	testNamespaceName = "test-ns"
 )
 
 func TestAPIs(t *testing.T) {
@@ -52,8 +55,8 @@ var _ = BeforeSuite(func() {
 
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
-		ErrorIfCRDPathMissing: false,
+		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "..", "manifests", "base", "crds", "minimal")},
+		ErrorIfCRDPathMissing: true,
 
 		// The BinaryAssetsDirectory is only required if you want to run the tests directly
 		// without call the makefile target test. If not informed it will look for the
@@ -64,7 +67,7 @@ var _ = BeforeSuite(func() {
 			fmt.Sprintf("1.31.0-%s-%s", runtime.GOOS, runtime.GOARCH)),
 
 		WebhookInstallOptions: envtest.WebhookInstallOptions{
-			Paths: []string{filepath.Join("..", "..", "..", "config", "webhook")},
+			Paths: []string{filepath.Join("..", "..", "..", "manifests", "base", "webhook")},
 		},
 	}
 
@@ -75,6 +78,9 @@ var _ = BeforeSuite(func() {
 	Expect(cfg).NotTo(BeNil())
 
 	scheme := apimachineryruntime.NewScheme()
+	err = corev1.AddToScheme(scheme)
+	Expect(err).NotTo(HaveOccurred())
+
 	err = argoprojiov1alpha1.AddToScheme(scheme)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -86,6 +92,12 @@ var _ = BeforeSuite(func() {
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
+	err = k8sClient.Create(ctx, &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: testNamespaceName,
+		},
+	})
+	Expect(err).ToNot(HaveOccurred())
 
 	// start webhook server using Manager.
 	webhookInstallOptions := &testEnv.WebhookInstallOptions
@@ -130,4 +142,85 @@ var _ = AfterSuite(func() {
 	cancel()
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
+})
+
+// test helper
+func validateOperation(shouldErr bool, errRegexp, operation string, obj client.Object) {
+	var err error
+	switch operation {
+	case "CREATE":
+		err = k8sClient.Create(ctx, obj)
+	case "UPDATE":
+		err = k8sClient.Update(ctx, obj)
+	}
+	if shouldErr {
+		Expect(err).To(HaveOccurred())
+		if errRegexp != "" {
+			Expect(err.Error()).To(MatchRegexp(errRegexp))
+		}
+	} else {
+		Expect(err).ToNot(HaveOccurred())
+	}
+}
+
+// test data
+const (
+	testWorkflowTemplateName        = "test-wft-v1.0.0"
+	testClusterWorkflowTemplateName = "test-cwft-v1.0.0"
+)
+
+// setup custom resources
+var _ = BeforeEach(func() {
+	wfSpec := argoprojiov1alpha1.WorkflowSpec{
+		Entrypoint: "entrypoint",
+		Templates: []argoprojiov1alpha1.Template{
+			{
+				Name: "entrypoint",
+				Steps: []argoprojiov1alpha1.ParallelSteps{
+					{
+						Steps: []argoprojiov1alpha1.WorkflowStep{
+							{
+								Name: "main-step",
+								Inline: &argoprojiov1alpha1.Template{
+									Name: "inline",
+									Container: &corev1.Container{
+										Name:    "main-container",
+										Image:   "whalesay",
+										Command: []string{"launcher"},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	err := k8sClient.Create(ctx, &argoprojiov1alpha1.WorkflowTemplate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testWorkflowTemplateName,
+			Namespace: testNamespaceName,
+		},
+		Spec: wfSpec,
+	})
+	Expect(err).ToNot(HaveOccurred())
+	err = k8sClient.Create(ctx, &argoprojiov1alpha1.ClusterWorkflowTemplate{
+		ObjectMeta: metav1.ObjectMeta{Name: testClusterWorkflowTemplateName},
+		Spec:       wfSpec,
+	})
+	Expect(err).ToNot(HaveOccurred())
+})
+
+var _ = AfterEach(func() {
+	err := k8sClient.Delete(ctx, &argoprojiov1alpha1.WorkflowTemplate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      testWorkflowTemplateName,
+			Namespace: testNamespaceName,
+		},
+	})
+	Expect(err).ToNot(HaveOccurred())
+	err = k8sClient.Delete(ctx, &argoprojiov1alpha1.ClusterWorkflowTemplate{
+		ObjectMeta: metav1.ObjectMeta{Name: testClusterWorkflowTemplateName},
+	})
+	Expect(err).ToNot(HaveOccurred())
 })
